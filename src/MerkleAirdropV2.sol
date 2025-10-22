@@ -13,9 +13,10 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+//import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-contract MerkleAirdrop is
+contract MerkleAirdropV2 is
     Initializable,
     EIP712Upgradeable,
     OwnableUpgradeable,
@@ -44,6 +45,8 @@ contract MerkleAirdrop is
     event Claimed(address account, uint256 amount);
     event MerkleRootUpdated(bytes32 root);
     event AirdropTokenUpdated(address token);
+    event AirdropPaused(address owner);
+    event AirdropUnpaused(address owner);
 
     bytes32 private merkleRoot;
     IERC20 private airdropToken;
@@ -55,7 +58,9 @@ contract MerkleAirdrop is
     //     i_merkleRoot = merkleRoot;
     //     i_airdropToken = airdropToken;
     // }
-    constructor() initializer {}
+    constructor() {
+        _disableInitializers();
+    }
 
     function grantCanUpgradeRole(address _account) external onlyOwner {
         _grantRole(CAN_UPGRADE_ROLE, _account);
@@ -70,14 +75,24 @@ contract MerkleAirdrop is
         airdropToken = IERC20(_airdropToken);
     }
 
-    // function setMerkleRoot(bytes32 _newRoot) external onlyOwner {
-    //     merkleRoot = _newRoot;
-    //     emit MerkleRootUpdated(_newRoot);
+    function setMerkleRoot(bytes32 _newRoot) external onlyOwner {
+        merkleRoot = _newRoot;
+        emit MerkleRootUpdated(_newRoot);
+    }
+
+    function setAirdropToken(address _token) external onlyOwner {
+        airdropToken = IERC20(_token);
+        emit AirdropTokenUpdated(_token);
+    }
+
+    // function pause() external onlyOwner {
+    //     _pause();
+    //     emit AirdropPaused(msg.sender);
     // }
 
-    // function setAirdropToken(address _token) external onlyOwner {
-    //     airdropToken = IERC20(_token);
-    //     emit AirdropTokenUpdated(_token);
+    // function unpause() external onlyOwner {
+    //     _unpause();
+    //     emit AirdropUnpaused(msg.sender);
     // }
 
     function claim(address account, uint256 amount, bytes32[] calldata merkleProof) external {
