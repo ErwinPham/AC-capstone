@@ -8,8 +8,15 @@ remappings = [
     'murky/=lib/murky/',
     'foundry-devops/=lib/foundry-devops',
     '@openzeppelin/contracts-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts',
+    '@openzeppelin/foundry-upgrades=lib/openzeppelin-foundry-upgrades/contracts',
+
 ]
 
 fs_permissions = [{ access = "read-write", path = "./" }]
 
+ffi = true
+ast = true
+extra_output = ["storageLayout"]
+extra_output_files = ["metadata"]
+build_info = true
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
