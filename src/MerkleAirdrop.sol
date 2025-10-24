@@ -37,7 +37,11 @@ contract MerkleAirdrop is
     UUPSUpgradeable,
     AccessControlUpgradeable
 {
+    /**
+     * Library
+     */
     using SafeERC20 for IERC20;
+
     /**
      * Error
      */
@@ -45,6 +49,8 @@ contract MerkleAirdrop is
     error MerkleAirdrop__InvalidProof();
     error MerkleAirdrop__AlreadyClaimed();
     error MerkleAirdrop__InvalidSignature();
+    error MerkleAirdrop__DepositMoreToClaim();
+    error MerkleAirdrop__TransferFailed();
 
     /**
      * Event
@@ -52,6 +58,7 @@ contract MerkleAirdrop is
     event Claimed(address account, uint256 amount);
     event MerkleRootUpdated(bytes32 root);
     event AirdropTokenUpdated(address token);
+    event WithdrawnETH(address indexed to, uint256 amount);
 
     /**
      * Variables
@@ -61,6 +68,8 @@ contract MerkleAirdrop is
     bytes32 private merkleRoot;
     IERC20 private airdropToken;
     mapping(address claimer => bool claimed) private s_hasClaimed;
+    uint256 public publicClaimAmount;
+    uint256 public feeClaim;
 
     struct Airdropclaim {
         address account;
@@ -81,6 +90,62 @@ contract MerkleAirdrop is
 
         merkleRoot = _merkleRoot;
         airdropToken = IERC20(_airdropToken);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                          NEW FUNCTIONS: SETTING NEW ROOT AND NEW TOKEN                                     //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function setMerkleRoot(bytes32 _newRoot) external onlyOwner {
+        merkleRoot = _newRoot;
+        emit MerkleRootUpdated(_newRoot);
+    }
+
+    function setAirdropToken(address _token) external onlyOwner {
+        airdropToken = IERC20(_token);
+        emit AirdropTokenUpdated(_token);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                        NEW FUNCTIONS: PUBLIC CLAIM AND WITHDRAW ETH BY OWNER                               //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function publicClaim(address account, uint256 amount, bytes32[] calldata merkleProof) public payable {
+        // user >= 0.01 ether to Claim airdrop
+        if (msg.value < 0.01 ether) {
+            revert MerkleAirdrop__DepositMoreToClaim();
+        }
+
+        if (s_hasClaimed[account]) {
+            revert MerkleAirdrop__AlreadyClaimed();
+        }
+
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(account, amount))));
+
+        if (!MerkleProof.verify(merkleProof, merkleRoot, leaf)) {
+            revert MerkleAirdrop__InvalidProof();
+        }
+        s_hasClaimed[account] = true;
+        emit Claimed(account, amount);
+        airdropToken.safeTransfer(account, amount);
+    }
+
+    // owner can withdraw all ETH
+    function withdrawEth(address payable _to) external onlyOwner {
+        uint256 balance = address(this).balance;
+        (bool success,) = _to.call{value: balance}("");
+        if (!success) {
+            revert MerkleAirdrop__TransferFailed();
+        }
+        emit WithdrawnETH(_to, balance);
+    }
+
+    function setFeeClaim(uint256 feeClaim_) external onlyOwner {
+        feeClaim = feeClaim_;
+    }
+
+    function setPublicClaimAmount(uint256 publicClaimAmount_) external onlyOwner {
+        publicClaimAmount = publicClaimAmount_;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

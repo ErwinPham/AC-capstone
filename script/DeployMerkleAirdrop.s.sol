@@ -18,7 +18,6 @@ contract DeployMerkleAirdrop is Script {
         // Deploy Token
         BagelToken bagelToken = new BagelToken();
         // Deploy Proxy (Implementation: MerkleAirdrop.sol)
-        bytes memory initData = abi.encodeWithSelector(MerkleAirdrop.initialize.selector, ROOT, IERC20(bagelToken));
         address proxy = Upgrades.deployUUPSProxy(
             "MerkleAirdrop.sol", abi.encodeCall(MerkleAirdrop.initialize, (ROOT, address(bagelToken)))
         );

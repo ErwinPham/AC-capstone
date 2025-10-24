@@ -6,9 +6,8 @@ import {Test, console} from "forge-std/Test.sol";
 import {MerkleAirdrop} from "../src/MerkleAirdrop.sol";
 import {BagelToken} from "../src/BagelToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-//import {ZkSyncChainChecker} from "foundry-devops/src/ZkSyncChainChecker.sol";
 import {DeployMerkleAirdrop} from "../script/DeployMerkleAirdrop.s.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract MerkleAirdropTest is Test {
     MerkleAirdrop merkleAirdop;
@@ -23,14 +22,14 @@ contract MerkleAirdropTest is Test {
     address user = 0x6CA6d1e2D5347Bfab1d91e883F1915560e09129D;
     address fakeUser = makeAddr("fake user");
     uint256 public AMOUNT_TO_CLAIM = 25000000000000000000;
-    ERC1967Proxy public proxy;
 
     function setUp() public {
         token = new BagelToken();
-        MerkleAirdrop airdropV1 = new MerkleAirdrop();
         bytes memory initData = abi.encodeWithSelector(MerkleAirdrop.initialize.selector, root, IERC20(token));
-        proxy = new ERC1967Proxy(address(airdropV1), initData);
-        //MerkleAirdrop(address(proxy)).initialize(root, address(token));
+        address proxy = Upgrades.deployUUPSProxy(
+            "MerkleAirdrop.sol", abi.encodeCall(MerkleAirdrop.initialize, (root, address(token)))
+        );
+        merkleAirdop = MerkleAirdrop(proxy);
         token.grantMintAndBurnRole(token.owner());
         token.mint(token.owner(), AMOUNT_TO_TRANSFER);
         IERC20(token).transfer(address(proxy), AMOUNT_TO_TRANSFER);
@@ -41,7 +40,7 @@ contract MerkleAirdropTest is Test {
         assertEq(0, startingBalance);
 
         vm.prank(user);
-        MerkleAirdrop(address(proxy)).claim(user, AMOUNT_TO_CLAIM, proof);
+        merkleAirdop.claim(user, AMOUNT_TO_CLAIM, proof);
 
         uint256 endiningBalance = IERC20(token).balanceOf(user);
 
@@ -51,12 +50,12 @@ contract MerkleAirdropTest is Test {
     function testUserNotInWhiteListCanNotClaim() public {
         vm.prank(fakeUser);
         vm.expectRevert();
-        MerkleAirdrop(address(proxy)).claim(fakeUser, AMOUNT_TO_CLAIM, proof);
+        merkleAirdop.claim(fakeUser, AMOUNT_TO_CLAIM, proof);
     }
 
     function testClaimedCheck() public {
         vm.prank(user);
-        MerkleAirdrop(address(proxy)).claim(user, AMOUNT_TO_CLAIM, proof);
-        MerkleAirdrop(address(proxy)).getClaimedCheck(user);
+        merkleAirdop.claim(user, AMOUNT_TO_CLAIM, proof);
+        merkleAirdop.getClaimedCheck(user);
     }
 }

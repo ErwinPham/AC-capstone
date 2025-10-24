@@ -45,6 +45,8 @@ contract MerkleAirdropV2 is
     error MerkleAirdrop__InvalidProof();
     error MerkleAirdrop__AlreadyClaimed();
     error MerkleAirdrop__InvalidSignature();
+    error MerkleAirdrop__DepositMoreToClaim();
+    error MerkleAirdrop__TransferFailed();
 
     /**
      * Event
@@ -52,6 +54,7 @@ contract MerkleAirdropV2 is
     event Claimed(address account, uint256 amount);
     event MerkleRootUpdated(bytes32 root);
     event AirdropTokenUpdated(address token);
+    event WithdrawnETH(address indexed to, uint256 amount);
 
     /**
      * Variables
@@ -61,6 +64,8 @@ contract MerkleAirdropV2 is
     bytes32 private merkleRoot;
     IERC20 private airdropToken;
     mapping(address claimer => bool claimed) private s_hasClaimed;
+    uint256 public publicClaimAmount;
+    uint256 public feeClaim;
 
     struct Airdropclaim {
         address account;
@@ -95,6 +100,43 @@ contract MerkleAirdropV2 is
     function setAirdropToken(address _token) external onlyOwner {
         airdropToken = IERC20(_token);
         emit AirdropTokenUpdated(_token);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                        NEW FUNCTIONS: PUBLIC CLAIM AND WITHDRAW ETH BY OWNER                               //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function publicClaim() public payable {
+        // user >= 0.01 ether to Claim airdrop
+        if (msg.value == feeClaim) {
+            revert MerkleAirdrop__DepositMoreToClaim();
+        }
+
+        if (s_hasClaimed[msg.sender]) {
+            revert MerkleAirdrop__AlreadyClaimed();
+        }
+
+        s_hasClaimed[msg.sender] = true;
+        emit Claimed(msg.sender, publicClaimAmount);
+        airdropToken.safeTransfer(msg.sender, publicClaimAmount);
+    }
+
+    // owner can withdraw all ETH
+    function withdrawEth(address payable _to) external onlyOwner {
+        uint256 balance = address(this).balance;
+        (bool success,) = _to.call{value: balance}("");
+        if (!success) {
+            revert MerkleAirdrop__TransferFailed();
+        }
+        emit WithdrawnETH(_to, balance);
+    }
+
+    function setFeeClaim(uint256 feeClaim_) external onlyOwner {
+        feeClaim = feeClaim_;
+    }
+
+    function setPublicClaimAmount(uint256 publicClaimAmount_) external onlyOwner {
+        publicClaimAmount = publicClaimAmount_;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
