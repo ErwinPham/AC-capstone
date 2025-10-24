@@ -43,7 +43,7 @@ contract MerkleAirdropTest is Test {
         merkleAirdop.claim(user, AMOUNT_TO_CLAIM, proof);
 
         uint256 endiningBalance = IERC20(token).balanceOf(user);
-
+        console.log("haizzz:");
         assertEq(endiningBalance - startingBalance, AMOUNT_TO_CLAIM);
     }
 
